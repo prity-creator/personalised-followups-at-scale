@@ -16,3 +16,5 @@ outbox.jsonl
 out/
 
 .DS_Store
+.superpowers/
+.venv/
