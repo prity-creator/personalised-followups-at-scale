@@ -40,7 +40,8 @@ class RunCounts:
 
 
 def _message_for(category: Category, prospect_name: str, asset_title: str) -> str:
-    first_name = prospect_name.split()[0] if prospect_name else "there"
+    parts = prospect_name.split()
+    first_name = parts[0] if parts else "there"
     openers = {
         Category.INTERESTED: "Glad it landed. I put this together for you:",
         Category.BOOK_CALL: "Before we talk, here is a 40 second version:",

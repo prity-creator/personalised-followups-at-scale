@@ -8,7 +8,7 @@ import pytest
 
 from followups.adapters.mock import FixtureProspects
 from followups.adapters.registry import default_registry
-from followups.domain.models import FollowUpState, Track
+from followups.domain.models import Category, FollowUpState, Track
 from followups.domain.routing import load_routing
 from followups.pipeline.daily import run
 from tests.conftest import NOW
@@ -99,3 +99,14 @@ def test_reply_from_an_unknown_prospect_is_skipped_not_crashed(repo, registry):
 def test_run_mirrors_to_the_crm_sink(seeded, registry, tmp_path):
     run(seeded, registry, ROUTING, now=NOW)
     assert "<table" in (tmp_path / "dashboard.html").read_text()
+
+
+def test_message_survives_a_blank_prospect_name():
+    """A whitespace-only name must not crash the message builder.
+
+    Found during final review: `name.split()[0]` raises IndexError on " ",
+    which is truthy, so the falsy guard does not catch it.
+    """
+    from followups.pipeline.daily import _message_for
+
+    assert _message_for(Category.INTERESTED, "   ", "A deck").startswith("there,")

@@ -12,7 +12,7 @@ from followups.adapters.mock import (
     KeywordClassifier,
 )
 from followups.adapters.registry import default_registry
-from followups.domain.models import Category
+from followups.domain.models import Category, FollowUpState
 from tests.conftest import NOW, make_follow_up, make_prospect, make_reply
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
@@ -93,7 +93,7 @@ def test_html_dashboard_sink_writes_a_table(tmp_path, repo):
 def test_html_dashboard_escapes_untrusted_text(tmp_path, repo):
     repo.upsert_prospect(make_prospect())
     repo.queue(make_follow_up("f1"), NOW)
-    repo.set_state("f1", __import__("followups.domain.models", fromlist=["x"]).FollowUpState.FAILED, reason="<script>alert(1)</script>")
+    repo.set_state("f1", FollowUpState.FAILED, reason="<script>alert(1)</script>")
     out = tmp_path / "dashboard.html"
     HtmlDashboardSink(out).sync(repo.all_records())
     assert "<script>alert(1)</script>" not in out.read_text()
