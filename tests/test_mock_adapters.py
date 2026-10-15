@@ -83,11 +83,11 @@ def test_file_sender_appends_one_line_per_send(tmp_path):
     assert json.loads(lines[0])["follow_up_id"] == "f1"
 
 
-def test_html_dashboard_sink_writes_a_table(tmp_path, repo):
+def test_html_dashboard_sink_writes_a_row_per_record(tmp_path, repo):
     repo.queue(make_follow_up("f1"), NOW)
     out = tmp_path / "dashboard.html"
     HtmlDashboardSink(out).sync(repo.all_records())
-    assert "<table" in out.read_text()
+    assert out.read_text().count('class="row"') == 1
 
 
 def test_html_dashboard_escapes_untrusted_text(tmp_path, repo):

@@ -68,4 +68,6 @@ received that kind of resource.
 - Do not send anything the user has not approved in this conversation.
 - Do not edit `config/routing.yaml` without saying what the change does to
   which category.
-- Do not implement the real adapters. They are deliberately stubbed.
+- Do not implement the paid real adapters. They are deliberately stubbed.
+  `SheetsSink` is the one that is implemented, and it still needs a
+  credential before anything reaches Google.

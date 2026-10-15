@@ -31,13 +31,13 @@ mindmap
         Local deck, video, visual
         File sender
         HTML dashboard
-      Real, stubbed
-        HeyReach
-        Claude
-        Gamma
-        HeyGen and ElevenLabs
-        Gemini
-        Google Sheets
+      Real, credential guarded
+        HeyReach, stubbed
+        Claude, stubbed
+        Gamma, stubbed
+        HeyGen and ElevenLabs, stubbed
+        Gemini, stubbed
+        Google Sheets, implemented
     Storage
       SQLite source of truth
       Message id is primary key

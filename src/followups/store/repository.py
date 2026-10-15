@@ -73,8 +73,10 @@ class Repository:
         point where duplicate ingest is prevented.
         """
         self.conn.execute(
-            """INSERT INTO replies (id, prospect_id, text, received_at, ingested_at)
-               VALUES (?, ?, ?, ?, ?)
+            """INSERT INTO replies
+               (id, prospect_id, text, received_at, ingested_at,
+                conversation_id, account_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO NOTHING""",
             (
                 reply.id,
@@ -82,6 +84,8 @@ class Repository:
                 reply.text,
                 reply.received_at.isoformat(),
                 (now or datetime.now().astimezone()).isoformat(),
+                reply.conversation_id,
+                reply.account_id,
             ),
         )
         self.conn.commit()
@@ -93,15 +97,22 @@ class Repository:
                WHERE c.reply_id IS NULL
                ORDER BY r.received_at"""
         ).fetchall()
-        return [
-            Reply(
-                id=r["id"],
-                prospect_id=r["prospect_id"],
-                text=r["text"],
-                received_at=datetime.fromisoformat(r["received_at"]),
-            )
-            for r in rows
-        ]
+        return [self._to_reply(r) for r in rows]
+
+    @staticmethod
+    def _to_reply(row: sqlite3.Row) -> Reply:
+        return Reply(
+            id=row["id"],
+            prospect_id=row["prospect_id"],
+            text=row["text"],
+            received_at=datetime.fromisoformat(row["received_at"]),
+            conversation_id=row["conversation_id"] or "",
+            account_id=row["account_id"],
+        )
+
+    def get_reply(self, reply_id: str) -> Reply | None:
+        row = self.conn.execute("SELECT * FROM replies WHERE id = ?", (reply_id,)).fetchone()
+        return self._to_reply(row) if row else None
 
     # -- classifications ---------------------------------------------------
 
@@ -167,8 +178,8 @@ class Repository:
         self.conn.execute(
             """INSERT INTO follow_ups
                (id, prospect_id, reply_id, track, asset_url, asset_title,
-                message_text, state, reason, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                asset_preview, message_text, state, reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 follow_up.id,
                 follow_up.prospect_id,
@@ -176,6 +187,7 @@ class Repository:
                 follow_up.track.value,
                 asset.url if asset else "",
                 asset.title if asset else "",
+                asset.preview_path if asset else "",
                 follow_up.message_text,
                 follow_up.state.value,
                 follow_up.reason,
@@ -195,7 +207,12 @@ class Repository:
     def _to_follow_up(row: sqlite3.Row) -> FollowUp:
         track = Track(row["track"])
         asset = (
-            Asset(track=track, url=row["asset_url"], title=row["asset_title"], preview_path="")
+            Asset(
+                track=track,
+                url=row["asset_url"],
+                title=row["asset_title"],
+                preview_path=row["asset_preview"],
+            )
             if row["asset_url"]
             else None
         )
@@ -242,10 +259,14 @@ class Repository:
 
     def all_records(self) -> list[FollowUpRecord]:
         rows = self.conn.execute(
-            """SELECT f.*, p.name AS pname, p.company AS pcompany, c.category AS category
+            """SELECT f.*,
+                      p.name AS pname, p.company AS pcompany, p.role AS prole,
+                      c.category AS category, c.confidence AS confidence,
+                      r.text AS reply_text
                FROM follow_ups f
                LEFT JOIN prospects p ON p.id = f.prospect_id
                LEFT JOIN classifications c ON c.reply_id = f.reply_id
+               LEFT JOIN replies r ON r.id = f.reply_id
                ORDER BY f.created_at, f.id"""
         ).fetchall()
         return [
@@ -259,6 +280,12 @@ class Repository:
                 reason=r["reason"],
                 asset_url=r["asset_url"],
                 created_at=datetime.fromisoformat(r["created_at"]),
+                role=r["prole"] or "",
+                reply_text=r["reply_text"] or "",
+                message_text=r["message_text"],
+                asset_title=r["asset_title"],
+                asset_preview_path=r["asset_preview"],
+                confidence=r["confidence"] or 0.0,
             )
             for r in rows
         ]

@@ -68,6 +68,22 @@ def _record_skip(repo, prospect_id: str, reply_id: str, track: Track, reason: st
     )
 
 
+
+def _discover_prospects(inbox, since: datetime | None):
+    """People the inbox knows about.
+
+    An inbox that cannot supply them is still a valid inbox, so a missing
+    method or a failure here costs prospect discovery, not the whole run.
+    """
+    fetch = getattr(inbox, "fetch_prospects", None)
+    if fetch is None:
+        return []
+    try:
+        return fetch(since)
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def run(
     repo,
     registry: Registry,
@@ -85,6 +101,12 @@ def run(
 
     # 1. Ingest. Duplicate message ids are dropped by the schema, so an
     # overlapping window is harmless and the watermark is only an optimisation.
+    # The inbox is also where new people come from: a real reply arrives from
+    # someone the database has never seen. Learn them first, or every genuine
+    # reply would be skipped as an unknown prospect.
+    for prospect in _discover_prospects(registry.inbox, since):
+        repo.upsert_prospect(prospect, now)
+
     for reply in registry.inbox.fetch_replies(since):
         repo.upsert_reply(reply, now)
         counts.ingested += 1
@@ -159,7 +181,15 @@ def run(
     # 6. Send. Three conditions, all independent: approved, live, real sender.
     if live_send:
         for follow_up in repo.approved():
-            result = registry.sender.send(follow_up)
+            # The sender needs the original reply to answer in the same thread.
+            reply = repo.get_reply(follow_up.reply_id)
+            if reply is None:
+                repo.set_state(
+                    follow_up.id, FollowUpState.FAILED, reason="original reply not found"
+                )
+                counts.failed += 1
+                continue
+            result = registry.sender.send(follow_up, reply)
             if result.ok:
                 repo.set_state(follow_up.id, FollowUpState.SENT, sent_at=now)
                 counts.sent += 1

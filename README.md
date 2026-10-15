@@ -18,6 +18,18 @@ produces a personalised resource that fits that specific answer:
 
 Nothing reaches a real person without a human approving it first.
 
+## Two ways to run it
+
+**Without keys**, it runs the whole pipeline on sample data and produces
+*placeholder* assets: local HTML and SVG files standing in for a real Gamma
+deck or Gemini graphic. Nothing is sent, nothing is charged, no account is
+needed. This is what the quickstart below does, and it is how the tests run.
+
+**With keys**, the same pipeline calls the real services: HeyReach for replies
+and sending, Claude to classify, Gamma for the deck, HeyGen and ElevenLabs for
+the video, Gemini for the graphic. Every adapter is implemented, not stubbed.
+Add `--live` and see [docs/deploying.md](docs/deploying.md).
+
 ## Run it in 60 seconds, with no API keys
 
 This is the part worth checking before reading any code. **The whole pipeline
@@ -79,7 +91,8 @@ ingest -> classify -> route and gate -> generate -> queue -> send -> mirror
   production; local HTML and SVG here.
 - **Queue** parks it as `PENDING`. A human decides.
 - **Send** only touches approved rows, and only with `--live-send`.
-- **Mirror** writes the whole queue to a dashboard you can look at.
+- **Mirror** writes the whole queue to a dashboard you can look at, or to
+  a Google Sheet if you would rather work in rows.
 
 [`docs/architecture.md`](docs/architecture.md) has the detail,
 [`docs/mindmap.md`](docs/mindmap.md) has it as a diagram.
@@ -111,14 +124,28 @@ A fresh clone fails all three. The mock sender appends to a file.
 ## Bring your own keys
 
 The prototype needs none of this. To point it at real services, copy
-[`.env.example`](.env.example) to `.env` and fill in the providers you want:
-HeyReach, Anthropic, Gamma, HeyGen, ElevenLabs, Gemini, Google Sheets.
+[`.env.example`](.env.example) to `.env`, fill in the providers you want, and
+add `--live`:
 
-The real adapters in [`src/followups/adapters/`](src/followups/adapters/)
-declare their endpoints and refuse to construct without a credential, but their
-API calls are deliberately unimplemented: live calls are out of scope precisely
-so this repository stays free to run. Each one names the endpoint and the docs
-to implement against.
+```bash
+followups run --live              # real providers, still sends nothing
+followups run --live --live-send  # also sends approved follow-ups
+```
+
+The two flags are separate on purpose. `--live` spends money generating assets;
+`--live-send` puts a message in front of a person. You will often want the
+first without the second.
+
+Every adapter in [`src/followups/adapters/`](src/followups/adapters/) is a real
+implementation against the provider's documented API, with retries, bounded
+polling for the asynchronous ones, and unit tests that assert the exact request
+it builds. The tests drive them through a fake HTTP client, so the suite still
+makes no network call and costs nothing.
+
+What has **not** happened is a live call from this repository to any provider.
+The request shapes come from each provider's published docs. Expect to adjust
+something the first time you run `--live`, and see the verification table in
+[docs/deploying.md](docs/deploying.md).
 
 `.env` is gitignored, and a test fails the build if anything shaped like a real
 key appears in `.env.example`.
@@ -128,8 +155,24 @@ key appears in `.env.example`.
 SQLite is the source of truth: one file, no accounts, no rate limits, and the
 dedupe and cadence rules become trivially testable. Presentation is a separate
 port, `CrmSink`, so the same records can be pushed anywhere without the data
-model following a vendor. Two sinks ship here, a generated HTML dashboard and a
-Google Sheets stub. HubSpot or Airtable is one class implementing one method.
+model following a vendor. HubSpot or Airtable is one class implementing one
+method.
+
+Two sinks ship here:
+
+- **`HtmlDashboardSink`** writes `dashboard.html`: a single self-contained file
+  with counts across the top, filters by track and by state, a search box, and
+  every row showing what the prospect actually said next to the message waiting
+  to go back. No server, no build step, nothing loaded from a CDN, and it reads
+  correctly in a light or a dark colour scheme. Open it with `open`, mail it to
+  someone, it still works.
+- **`SheetsSink`** mirrors the same records into a Google Sheet for anyone who
+  would rather filter in a spreadsheet. It needs a credential, so the default
+  run never touches it.
+
+Prospect-written text reaches both. The dashboard escapes every field it
+renders and refuses to link anything that is not an http, https or file url,
+and tests hold that line.
 
 ## Adding a fourth kind of resource
 
@@ -147,11 +190,14 @@ src/followups/
   adapters/   mock + real implementations of each
   store/      sqlite schema and repository
   pipeline/   the daily run
-tests/        113 tests, none of which touch a network
+tests/        the whole suite, none of which touches a network
 docs/         architecture, mindmap, how to extend
 ```
 
 ## Status
 
-Prototype. Built to be read and run. Not deployed, holds no credentials, and
-makes no live API calls.
+Working prototype, deployable by anyone with their own keys. It holds no
+credentials and has never made a live API call from this repository. The
+default wiring is mocks, enforced by a test, so cloning it costs nothing.
+
+See [docs/deploying.md](docs/deploying.md) to run it against real services.

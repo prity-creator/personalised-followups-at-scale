@@ -93,3 +93,38 @@ def test_all_records_joins_prospect_and_category(repo):
     record = repo.all_records()[0]
     assert record.prospect_name == "Ada Lovelace"
     assert record.category is Category.INTERESTED
+
+
+def test_all_records_carries_the_reply_text_for_presentation(repo):
+    repo.upsert_prospect(make_prospect())
+    repo.upsert_reply(make_reply("m1", text="tell me more about pricing"))
+    repo.queue(make_follow_up("f1"), NOW)
+    assert repo.all_records()[0].reply_text == "tell me more about pricing"
+
+
+def test_all_records_carries_the_role_and_classifier_confidence(repo):
+    repo.upsert_prospect(make_prospect())
+    repo.upsert_reply(make_reply("m1"))
+    repo.save_classification("m1", make_classification())
+    repo.queue(make_follow_up("f1"), NOW)
+    record = repo.all_records()[0]
+    assert record.role == "CTO"
+    assert record.confidence == 0.9
+
+
+def test_all_records_carries_the_drafted_message_and_asset(repo):
+    repo.queue(make_follow_up("f1"), NOW)
+    record = repo.all_records()[0]
+    assert record.message_text == "hello"
+    assert record.asset_title == "T"
+    assert record.asset_preview_path == "p.html"
+
+
+def test_asset_preview_path_survives_a_round_trip(repo):
+    repo.queue(make_follow_up("f1"), NOW)
+    assert repo.pending()[0].asset.preview_path == "p.html"
+
+
+def test_a_record_for_a_reply_that_is_gone_still_renders(repo):
+    repo.queue(make_follow_up("f1"), NOW)
+    assert repo.all_records()[0].reply_text == ""

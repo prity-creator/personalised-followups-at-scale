@@ -14,8 +14,11 @@ from pathlib import Path
 
 import click
 
+from followups.adapters.base import MissingCredentials
 from followups.adapters.mock import FixtureProspects
-from followups.adapters.registry import FIXTURES_DIR, default_registry
+from followups.adapters.base import MissingCredentials
+from followups.adapters.registry import FIXTURES_DIR, default_registry, live_registry
+from followups.adapters.sheets import SheetsSink
 from followups.domain.models import FollowUpState
 from followups.domain.routing import load_routing
 from followups.pipeline.daily import run as run_pipeline
@@ -57,17 +60,31 @@ def seed() -> None:
 
 @cli.command()
 @click.option(
+    "--live",
+    is_flag=True,
+    help="Use the real providers instead of mocks. Requires credentials in .env.",
+)
+@click.option(
     "--live-send",
     is_flag=True,
     help="Actually hand approved follow-ups to the sender. Off by default.",
 )
-def run(live_send: bool) -> None:
-    """Run one pipeline pass: ingest, classify, route, generate, queue."""
+def run(live: bool, live_send: bool) -> None:
+    """Run one pipeline pass: ingest, classify, route, generate, queue.
+
+    Without --live this uses mock providers and costs nothing. The two flags are
+    deliberately separate: --live spends money generating assets, --live-send
+    puts a message in front of a person, and you can want one without the other.
+    """
     home = _home()
     repo = _repository(home)
+    try:
+        registry = live_registry(home) if live else default_registry(home)
+    except MissingCredentials as exc:
+        raise click.ClickException(str(exc)) from exc
     counts = run_pipeline(
         repo,
-        default_registry(home),
+        registry,
         load_routing(),
         now=_now(),
         live_send=live_send,
@@ -123,6 +140,23 @@ def dashboard() -> None:
     sink = default_registry(home).crm_sink
     sink.sync(repo.all_records())
     click.echo(f"wrote {home / 'dashboard.html'}")
+
+
+@cli.command("sheets-sync")
+def sheets_sync() -> None:
+    """Mirror the queue into Google Sheets. Needs GOOGLE_SHEETS_* in the env.
+
+    The pipeline never calls this. It is a separate command precisely so the
+    default run stays offline and free.
+    """
+    repo = _repository(_home())
+    try:
+        sink = SheetsSink.from_env()
+    except MissingCredentials as exc:
+        raise click.ClickException(str(exc)) from exc
+    records = repo.all_records()
+    sink.sync(records)
+    click.echo(f"mirrored {len(records)} records into tab {sink.tab}")
 
 
 if __name__ == "__main__":

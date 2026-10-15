@@ -31,7 +31,7 @@ network and no credentials.
 | `Classifier` | Swapping models, or falling back to rules when the API is down, must not touch the pipeline. |
 | `AssetGenerator` | Three implementations today and a fourth is expected. Each is a different vendor with a different failure mode. |
 | `Sender` | The only component that can do something irreversible. Isolating it is what makes "nothing sends by accident" checkable. |
-| `CrmSink` | Presentation should never own the data model. SQLite stays the truth. |
+| `CrmSink` | Presentation should never own the data model. SQLite stays the truth, sinks are one-way mirrors of it. |
 
 ## The confidence floor
 
@@ -61,6 +61,25 @@ follow-up.
 re-ingesting a reply the system has already seen is a no-op at the database
 level, not a guard the pipeline has to remember. The run also keeps a
 watermark, but that is only an optimisation; correctness comes from the schema.
+
+## Presentation
+
+`CrmSink` is the only port with two shipping implementations, because the
+records need a face more than they need a vendor.
+
+`HtmlDashboardSink` renders one standalone file. It is the surface a demo opens
+and the surface an operator checks: counts for pending, sent, skipped and
+failed, filters by track and by state, and each row carrying the reply, the
+drafted message and a link to the generated asset. It depends on nothing it
+does not contain, which is what makes it portable.
+
+`SheetsSink` is the same records in a spreadsheet, for people who work in rows.
+It clears the tab and rewrites it on every sync, so a row deleted upstream
+disappears here too; appending would let the mirror drift from the truth.
+
+Everything a prospect wrote passes through these two. The dashboard escapes
+every interpolated value and only links schemes it recognises, so a reply
+cannot inject markup or a javascript url into a page an operator opens.
 
 ## Where the decisions live
 

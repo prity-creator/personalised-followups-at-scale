@@ -23,10 +23,32 @@ def test_real_adapter_is_not_in_the_default_registry(cls, tmp_path):
     assert all(not isinstance(a, cls) for a in default_registry(tmp_path).all_adapters())
 
 
-def test_real_adapter_port_method_is_explicitly_unimplemented(monkeypatch):
-    from followups.adapters.gamma import GammaDeckGenerator
+PORT_METHODS = {
+    "HeyReachInbox": "fetch_replies",
+    "HeyReachSender": "send",
+    "ClaudeClassifier": "classify",
+    "GammaDeckGenerator": "generate",
+    "HeyGenVideoGenerator": "generate",
+    "GeminiVisualGenerator": "generate",
+    "SheetsSink": "sync",
+    "ElevenLabsVoice": "synthesize",
+}
 
-    monkeypatch.setenv("GAMMA_API_KEY", "test-not-a-real-key")
-    generator = GammaDeckGenerator.from_env()
-    with pytest.raises(NotImplementedError, match="out of scope"):
-        generator.generate(None)
+
+@pytest.mark.parametrize("cls", ALL_REAL_ADAPTERS, ids=lambda c: c.__name__)
+def test_real_adapter_implements_its_port_method(cls):
+    """Every real adapter is implemented, not a stub that raises."""
+    method = getattr(cls, PORT_METHODS[cls.__name__], None)
+    assert callable(method), f"{cls.__name__} has no port method"
+
+
+@pytest.mark.parametrize("cls", ALL_REAL_ADAPTERS, ids=lambda c: c.__name__)
+def test_real_adapter_accepts_an_injected_http_client(cls):
+    """Injection is what makes these testable without a socket or a bill."""
+    from tests.fakes import FakeHttpClient
+
+    # Adapters needing a second required argument get it here; the point of the
+    # test is the injected client, not the constructor signature.
+    extra = {"SheetsSink": {"spreadsheet_id": "sheet-1"}}.get(cls.__name__, {})
+    fake = FakeHttpClient()
+    assert cls("a-key", http=fake, **extra).http is fake

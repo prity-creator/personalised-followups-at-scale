@@ -12,6 +12,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from followups.adapters.dashboard import render as render_dashboard
 from followups.domain.models import (
     Asset,
     AssetBrief,
@@ -39,10 +40,24 @@ UNMATCHED_CONFIDENCE = 0.3
 
 
 class FixtureInbox:
-    """Reads replies from a JSON file instead of the HeyReach inbox."""
+    """Reads replies from a JSON file instead of the HeyReach inbox.
 
-    def __init__(self, path: Path | str) -> None:
+    Also supplies the people, from the sibling prospects.json, so it satisfies
+    the same contract as a real inbox which returns both in one payload.
+    """
+
+    def __init__(self, path: Path | str, prospects_path: Path | str | None = None) -> None:
         self.path = Path(path)
+        self.prospects_path = (
+            Path(prospects_path)
+            if prospects_path is not None
+            else self.path.parent / "prospects.json"
+        )
+
+    def fetch_prospects(self, since: datetime | None) -> list[Prospect]:
+        if not self.prospects_path.is_file():
+            return []
+        return [Prospect(**item) for item in json.loads(self.prospects_path.read_text())]
 
     def fetch_replies(self, since: datetime | None) -> list[Reply]:
         raw = json.loads(self.path.read_text())
@@ -195,7 +210,7 @@ class FileSender:
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
 
-    def send(self, follow_up: FollowUp) -> SendResult:
+    def send(self, follow_up: FollowUp, reply: Reply | None = None) -> SendResult:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         line = json.dumps(
             {
@@ -214,42 +229,17 @@ class FileSender:
 class HtmlDashboardSink:
     """Renders every follow-up as one local page, so the data has a face.
 
-    This is the zero-account alternative to a CRM. SheetsSink implements the
-    same port against Google Sheets.
+    This is the zero-account alternative to a CRM: one self-contained file,
+    no server, no CDN, readable in a light or a dark colour scheme. The markup
+    lives in dashboard.py; this class owns only where it is written.
+    SheetsSink implements the same port against Google Sheets.
     """
-
-    COLUMNS = ("Prospect", "Company", "Category", "Track", "State", "Reason", "Asset")
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
 
     def sync(self, records: list[FollowUpRecord]) -> None:
-        head = "".join(f"<th>{c}</th>" for c in self.COLUMNS)
-        rows = "".join(self._row(r) for r in records)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(
-            "<!doctype html><meta charset=utf-8>"
-            "<title>Follow-up queue</title>"
-            "<style>body{font-family:system-ui,sans-serif;margin:2rem;color:#2C2C2A}"
-            "table{border-collapse:collapse;width:100%}"
-            "th,td{border-bottom:1px solid #D3D1C7;padding:.5rem .6rem;text-align:left;font-size:14px}"
-            "th{font-weight:500;color:#5F5E5A}</style>"
-            f"<h1>Follow-up queue</h1><p>{len(records)} records</p>"
-            f"<table><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
+            render_dashboard(records, base_dir=self.path.parent), encoding="utf-8"
         )
-
-    @staticmethod
-    def _row(record: FollowUpRecord) -> str:
-        link = (
-            f'<a href="{html.escape(record.asset_url)}">open</a>' if record.asset_url else ""
-        )
-        cells = [
-            html.escape(record.prospect_name),
-            html.escape(record.company),
-            record.category.value,
-            record.track.value,
-            record.state.value,
-            html.escape(record.reason),
-            link,
-        ]
-        return "<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>"

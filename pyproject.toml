@@ -11,6 +11,10 @@ dependencies = ["pyyaml>=6.0", "click>=8.1"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Only needed to sign a Google service account assertion, which the standard
+# library cannot do. The sheets sink works without it against an OAuth token,
+# and nothing else in the project imports it.
+sheets = ["google-auth>=2.23", "requests>=2.31"]
 
 [project.scripts]
 followups = "followups.cli:cli"

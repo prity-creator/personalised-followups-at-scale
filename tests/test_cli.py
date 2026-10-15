@@ -22,7 +22,9 @@ def test_seed_then_run_then_dashboard(home, runner):
     assert runner.invoke(cli, ["run"]).exit_code == 0
     result = runner.invoke(cli, ["dashboard"])
     assert result.exit_code == 0
-    assert "<table" in (home / "dashboard.html").read_text()
+    page = (home / "dashboard.html").read_text()
+    assert "Follow-up queue" in page
+    assert "Analytical Co" in page
 
 
 def test_run_prints_counts(home, runner):
@@ -76,3 +78,34 @@ def _first_pending_id(runner: CliRunner) -> str:
         line for line in runner.invoke(cli, ["review"]).output.splitlines() if "DECK" in line
     )
     return line.split()[0]
+
+
+def test_sheets_sync_refuses_without_credentials(home, runner, monkeypatch):
+    monkeypatch.delenv("GOOGLE_SHEETS_CREDENTIALS", raising=False)
+    result = runner.invoke(cli, ["sheets-sync"])
+    assert result.exit_code != 0
+    assert "GOOGLE_SHEETS_CREDENTIALS" in result.output
+
+
+def test_sheets_sync_is_not_reached_by_a_normal_run(home, runner):
+    """The default pipeline mirrors to the dashboard and nothing else."""
+    runner.invoke(cli, ["seed"])
+    assert runner.invoke(cli, ["run"]).exit_code == 0
+    assert (home / "dashboard.html").exists()
+
+
+def test_live_without_credentials_fails_with_the_variable_name(home, runner):
+    """Asking for live mode with no keys must say which one is missing."""
+    for key in ("HEYREACH_API_KEY", "ANTHROPIC_API_KEY", "GAMMA_API_KEY"):
+        import os
+
+        os.environ.pop(key, None)
+    runner.invoke(cli, ["seed"])
+    result = runner.invoke(cli, ["run", "--live"])
+    assert result.exit_code != 0
+    assert "HEYREACH_API_KEY" in result.output
+
+
+def test_run_without_live_uses_mocks_and_needs_no_keys(home, runner):
+    runner.invoke(cli, ["seed"])
+    assert runner.invoke(cli, ["run"]).exit_code == 0

@@ -61,6 +61,10 @@ class Reply:
     prospect_id: str
     text: str
     received_at: datetime
+    # Provider routing details, needed to reply in the same thread. Empty for
+    # fixture data, populated by a real inbox adapter.
+    conversation_id: str = ""
+    account_id: int | None = None
 
     def __post_init__(self) -> None:
         _require_aware(self.received_at, "received_at")
@@ -108,7 +112,13 @@ class SendResult:
 
 @dataclass(frozen=True)
 class FollowUpRecord:
-    """One flattened row for presentation surfaces."""
+    """One flattened row for presentation surfaces.
+
+    Everything a dashboard, a sheet or a CRM needs to show a follow-up without
+    querying anything else, including the reply it answers. The fields after
+    created_at carry defaults so a sink written against an earlier shape keeps
+    working.
+    """
 
     follow_up_id: str
     prospect_name: str
@@ -119,3 +129,9 @@ class FollowUpRecord:
     reason: str
     asset_url: str
     created_at: datetime
+    role: str = ""
+    reply_text: str = ""
+    message_text: str = ""
+    asset_title: str = ""
+    asset_preview_path: str = ""
+    confidence: float = 0.0

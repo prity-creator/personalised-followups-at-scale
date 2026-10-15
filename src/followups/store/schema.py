@@ -24,7 +24,9 @@ CREATE TABLE IF NOT EXISTS replies (
     prospect_id  TEXT NOT NULL,
     text         TEXT NOT NULL,
     received_at  TEXT NOT NULL,
-    ingested_at  TEXT NOT NULL
+    ingested_at  TEXT NOT NULL,
+    conversation_id TEXT NOT NULL DEFAULT '',
+    account_id      INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS classifications (
@@ -41,6 +43,7 @@ CREATE TABLE IF NOT EXISTS follow_ups (
     track        TEXT NOT NULL,
     asset_url    TEXT NOT NULL DEFAULT '',
     asset_title  TEXT NOT NULL DEFAULT '',
+    asset_preview TEXT NOT NULL DEFAULT '',
     message_text TEXT NOT NULL DEFAULT '',
     state        TEXT NOT NULL,
     reason       TEXT NOT NULL DEFAULT '',
@@ -62,6 +65,20 @@ CREATE INDEX IF NOT EXISTS idx_follow_ups_state ON follow_ups(state);
 """
 
 
+# Columns added after the first release. CREATE TABLE IF NOT EXISTS will not
+# add a column to a database that already exists, so each one is applied here.
+ADDED_COLUMNS: list[tuple[str, str, str]] = [
+    ("follow_ups", "asset_preview", "TEXT NOT NULL DEFAULT ''"),
+]
+
+
 def migrate(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    for table, column, definition in ADDED_COLUMNS:
+        if column not in _columns(conn, table):
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
     conn.commit()
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}

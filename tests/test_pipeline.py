@@ -89,8 +89,20 @@ def test_cadence_blocks_a_second_queue_while_one_is_open(seeded, registry):
 
 
 def test_reply_from_an_unknown_prospect_is_skipped_not_crashed(repo, registry):
-    # no prospects seeded at all
-    counts = run(repo, registry, ROUTING, now=NOW)
+    """An inbox that gives replies but no people must skip, not crash."""
+
+    class RepliesOnlyInbox:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def fetch_replies(self, since):
+            return self._inner.fetch_replies(since)
+
+        def fetch_prospects(self, since):
+            return []
+
+    anonymous = replace(registry, inbox=RepliesOnlyInbox(registry.inbox))
+    counts = run(repo, anonymous, ROUTING, now=NOW)
     assert counts.ingested == 6
     assert counts.queued == 0
     assert all("unknown prospect" in r.reason for r in repo.all_records())
@@ -98,7 +110,9 @@ def test_reply_from_an_unknown_prospect_is_skipped_not_crashed(repo, registry):
 
 def test_run_mirrors_to_the_crm_sink(seeded, registry, tmp_path):
     run(seeded, registry, ROUTING, now=NOW)
-    assert "<table" in (tmp_path / "dashboard.html").read_text()
+    page = (tmp_path / "dashboard.html").read_text()
+    assert "Analytical Co" in page
+    assert 'data-state="PENDING"' in page
 
 
 def test_message_survives_a_blank_prospect_name():
@@ -110,3 +124,28 @@ def test_message_survives_a_blank_prospect_name():
     from followups.pipeline.daily import _message_for
 
     assert _message_for(Category.INTERESTED, "   ", "A deck").startswith("there,")
+
+
+def test_run_upserts_people_the_inbox_discovered(repo, registry):
+    """A real inbox returns strangers. The run must learn them, not skip them."""
+    counts = run(repo, registry, ROUTING, now=NOW)
+    assert repo.get_prospect("p1") is not None
+    assert counts.queued > 0
+
+
+def test_send_receives_the_reply_so_it_can_answer_in_thread(seeded, registry):
+    sent: list = []
+
+    class RecordingSender:
+        def send(self, follow_up, reply):
+            sent.append((follow_up.id, reply.id))
+            from followups.domain.models import SendResult
+
+            return SendResult(ok=True)
+
+    run(seeded, registry, ROUTING, now=NOW)
+    target = seeded.pending()[0]
+    seeded.set_state(target.id, FollowUpState.APPROVED)
+    recording = replace(registry, sender=RecordingSender())
+    run(seeded, recording, ROUTING, now=NOW + timedelta(days=1), live_send=True)
+    assert sent and sent[0][0] == target.id

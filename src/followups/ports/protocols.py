@@ -27,6 +27,15 @@ from followups.domain.models import (
 class InboxSource(Protocol):
     def fetch_replies(self, since: datetime | None) -> list[Reply]: ...
 
+    def fetch_prospects(self, since: datetime | None) -> list[Prospect]:
+        """The people behind those replies.
+
+        A real inbox returns strangers the database has never seen, so the
+        source of the replies is also the source of the people. Returning an
+        empty list is valid for a source that cannot supply them.
+        """
+        ...
+
 
 @runtime_checkable
 class Classifier(Protocol):
@@ -42,7 +51,7 @@ class AssetGenerator(Protocol):
 
 @runtime_checkable
 class Sender(Protocol):
-    def send(self, follow_up: FollowUp) -> SendResult: ...
+    def send(self, follow_up: FollowUp, reply: Reply) -> SendResult: ...
 
 
 @runtime_checkable
