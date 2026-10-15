@@ -29,7 +29,13 @@ def test_gitignore_excludes_the_real_env_file():
 
 @pytest.mark.parametrize(
     "path",
-    ["README.md", "docs/architecture.md", "docs/mindmap.md", "docs/adding-a-track.md"],
+    [
+        "README.md",
+        "docs/architecture.md",
+        "docs/mindmap.md",
+        "docs/adding-a-track.md",
+        "docs/presentation-layer.md",
+    ],
 )
 def test_documentation_exists(path):
     assert (ROOT / path).read_text().strip()
