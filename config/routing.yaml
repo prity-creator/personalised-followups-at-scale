@@ -1,0 +1,18 @@
+# Which kind of personalised resource each reply category receives.
+#
+# This file exists so that the decision is data, not code. The original brief
+# was contradictory about whether a positive or a negative reply should get the
+# deck; changing your mind is one edit here and no code change at all.
+#
+# Categories: INTERESTED, BOOK_CALL, OBJECTION, NOT_INTERESTED, REFERRAL, UNCLEAR
+# Tracks:     DECK, VIDEO, VISUAL, NONE
+#
+# Every category must appear. A missing or misspelled key fails at startup
+# rather than silently routing to NONE.
+
+INTERESTED: DECK       # positive signal, send the personalised deck
+BOOK_CALL: VIDEO       # asking to meet, a short personalised video converts best
+OBJECTION: VISUAL      # pushing back, answer with one page they can forward
+REFERRAL: DECK         # pointed at a colleague, give them something to pass on
+NOT_INTERESTED: NONE   # a clear no is left alone
+UNCLEAR: NONE          # low confidence, a human looks at it
