@@ -1,0 +1,8 @@
+[
+  {"id": "m1", "prospect_id": "p1", "text": "This sounds good, tell me more about how it works.", "received_at": "2026-10-15T09:00:00+00:00"},
+  {"id": "m2", "prospect_id": "p2", "text": "Happy to chat, can we book a call on Tuesday?", "received_at": "2026-10-15T09:10:00+00:00"},
+  {"id": "m3", "prospect_id": "p3", "text": "Honestly this looks too expensive for where we are.", "received_at": "2026-10-15T09:20:00+00:00"},
+  {"id": "m4", "prospect_id": "p4", "text": "Not interested, please remove me.", "received_at": "2026-10-15T09:30:00+00:00"},
+  {"id": "m5", "prospect_id": "p5", "text": "I am not the right person, you should reach out to our Head of Growth.", "received_at": "2026-10-15T09:40:00+00:00"},
+  {"id": "m6", "prospect_id": "p6", "text": "Hmm.", "received_at": "2026-10-15T09:50:00+00:00"}
+]
