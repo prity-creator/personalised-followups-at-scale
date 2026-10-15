@@ -9,6 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from followups.adapters.claude import ClaudeClassifier
+from followups.adapters.gamma import GammaDeckGenerator
+from followups.adapters.gemini import GeminiVisualGenerator
+from followups.adapters.heygen import HeyGenVideoGenerator
+from followups.adapters.heyreach import HeyReachInbox, HeyReachSender
+from followups.adapters.sheets import SheetsSink
 from followups.adapters.mock import (
     FileSender,
     FixtureInbox,
@@ -52,3 +58,16 @@ def default_registry(home: Path | str) -> Registry:
         sender=FileSender(home / "outbox.jsonl"),
         crm_sink=HtmlDashboardSink(home / "dashboard.html"),
     )
+
+
+# Every real adapter, so the credential guard and the "not in the default
+# registry" guard stay exhaustive as adapters are added.
+ALL_REAL_ADAPTERS = [
+    HeyReachInbox,
+    HeyReachSender,
+    ClaudeClassifier,
+    GammaDeckGenerator,
+    HeyGenVideoGenerator,
+    GeminiVisualGenerator,
+    SheetsSink,
+]
