@@ -1,0 +1,35 @@
+name: daily follow-up run
+
+# The cron is declared so the schedule is visible and reviewable, but the job
+# is gated on a manual trigger. A fork of this repository will never fire this
+# unattended, and never contacts anyone.
+on:
+  schedule:
+    - cron: "0 7 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      live_send:
+        description: "Actually send approved follow-ups"
+        type: boolean
+        default: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Run the pipeline
+        env:
+          FOLLOWUPS_HOME: ./out
+        run: |
+          followups seed
+          followups run ${{ inputs.live_send && '--live-send' || '' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: followup-queue
+          path: out/
