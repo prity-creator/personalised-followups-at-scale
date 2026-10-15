@@ -69,6 +69,10 @@ CREATE INDEX IF NOT EXISTS idx_follow_ups_state ON follow_ups(state);
 # add a column to a database that already exists, so each one is applied here.
 ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("follow_ups", "asset_preview", "TEXT NOT NULL DEFAULT ''"),
+    # Provider routing details, so a real sender can answer in the original
+    # LinkedIn thread. Without these an upgraded database fails on first write.
+    ("replies", "conversation_id", "TEXT NOT NULL DEFAULT ''"),
+    ("replies", "account_id", "INTEGER"),
 ]
 
 

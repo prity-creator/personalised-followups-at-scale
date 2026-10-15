@@ -207,3 +207,60 @@ def test_the_same_records_render_the_same_page(tmp_path):
     first = render([record("f1"), record("f2")], tmp_path)
     second = render([record("f1"), record("f2")], tmp_path)
     assert first == second
+
+
+# -- real inbox data, which is not as tidy as the fixtures ----------------
+
+
+def test_a_record_with_no_prospect_name_still_names_the_row(tmp_path):
+    page = render([record("f1", prospect_name="", company="", role="")], tmp_path)
+    assert "Unknown prospect" in page
+
+
+def test_a_row_with_no_company_or_role_skips_the_subtitle(tmp_path):
+    page = render([record("f1", company="", role="")], tmp_path)
+    assert "<small>" not in page
+
+
+def test_a_row_with_only_a_company_reads_cleanly(tmp_path):
+    page = render([record("f1", role="")], tmp_path)
+    assert "<small>Analytical Co</small>" in page
+
+
+def test_a_row_with_no_reply_text_says_so_rather_than_showing_a_gap(tmp_path):
+    page = render([record("f1", reply_text="")], tmp_path)
+    assert "No reply text" in page
+
+
+def test_line_breaks_in_a_reply_are_preserved(tmp_path):
+    page = render([record("f1", reply_text="First line.\n\nSecond line.")], tmp_path)
+    assert "First line.\n\nSecond line." in page
+    assert "white-space: pre-wrap" in page
+
+
+def test_a_long_unbroken_url_cannot_push_the_layout_sideways(tmp_path):
+    page = render([record("f1", reply_text="see https://" + "a" * 300 + ".com")], tmp_path)
+    assert "overflow-wrap: anywhere" in page
+
+
+def test_a_record_with_every_text_field_empty_still_renders(tmp_path):
+    page = render(
+        [
+            record(
+                "f1",
+                prospect_name="",
+                company="",
+                role="",
+                reply_text="",
+                message_text="",
+                reason="",
+                asset_url="",
+                asset_title="",
+                asset_preview_path="",
+                confidence=0.0,
+            )
+        ],
+        tmp_path,
+    )
+    assert 'class="row"' in page
+    assert "Unknown prospect" in page

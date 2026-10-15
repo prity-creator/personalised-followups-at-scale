@@ -156,13 +156,17 @@ input[type="search"] {
 blockquote {
   margin: .8rem 0 0; padding: .6rem .9rem;
   background: var(--surface-2); border-left: 3px solid var(--line); border-radius: 0 8px 8px 0;
+  /* A real reply arrives with its own line breaks, and sometimes a url long
+     enough to push the page sideways. Keep both inside the card. */
+  white-space: pre-wrap; overflow-wrap: anywhere;
 }
 blockquote .cap, .draft .cap {
   display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .07em;
   color: var(--muted); margin-bottom: .2rem;
 }
 .draft { margin-top: .7rem; }
-.draft p { margin: 0; }
+.draft p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.nothing { margin: .8rem 0 0; color: var(--muted); font-style: italic; font-size: .88rem; }
 .row footer {
   display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: center;
   margin-top: .85rem; padding-top: .7rem; border-top: 1px solid var(--line);
@@ -310,6 +314,10 @@ def _row(record: FollowUpRecord, base_dir: Path | None) -> str:
             '<blockquote><span class="cap">They replied</span>'
             f"{escape(record.reply_text)}</blockquote>"
         )
+    else:
+        # A live inbox can hand over a message with no body, or one whose body
+        # never reached the store. Say that, rather than leaving a blank card.
+        parts.append('<p class="nothing">No reply text recorded.</p>')
     if record.message_text:
         parts.append(
             '<div class="draft"><span class="cap">We would send</span>'
