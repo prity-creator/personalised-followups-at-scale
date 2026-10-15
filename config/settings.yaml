@@ -1,0 +1,13 @@
+# Behaviour. Credentials live in .env, never here.
+
+cadence:
+  min_gap_hours: 48    # no two follow-ups to one person closer than this
+  silence_days: 3      # no reply within this many days and the prospect goes dormant
+  max_touches: 3       # hard ceiling on follow-ups per prospect
+
+classifier:
+  confidence_floor: 0.6   # below this, the category is rewritten to UNCLEAR
+
+send:
+  live: false          # must be true AND a real sender configured AND the
+                       # follow-up APPROVED before anything reaches a person
